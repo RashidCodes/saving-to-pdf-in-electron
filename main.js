@@ -1,6 +1,12 @@
 // Modules to control application life and create native browser window
-const {app, BrowserWindow} = require('electron')
-const path = require('path')
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const path = require('path');
+
+
+/////// ///////  ///////  /////// 
+const fs = require('fs');
+
+// communicate with the UI using shell
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -12,15 +18,18 @@ function createWindow () {
     width: 800,
     height: 600,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: true
     }
-  })
+  });
 
   // and load the index.html of the app.
-  mainWindow.loadFile('index.html')
+  mainWindow.loadFile('index.html');
 
   // Open the DevTools.
   // mainWindow.webContents.openDevTools()
+
+  
 
   // Emitted when the window is closed.
   mainWindow.on('closed', function () {
@@ -29,6 +38,8 @@ function createWindow () {
     // when you should delete the corresponding element.
     mainWindow = null
   })
+
+  
 }
 
 // This method will be called when Electron has finished
@@ -48,6 +59,35 @@ app.on('activate', function () {
   // dock icon is clicked and there are no other windows open.
   if (mainWindow === null) createWindow()
 })
+
+
+ipcMain.on('print-to-pdf', (event) => {
+  // path of the file to be converted
+  const pdfPath = path.join(__dirname, "print.pdf");
+  
+  // renderer process
+  const win = BrowserWindow.fromWebContents(event.sender);
+
+  // create the pdf file using the window's (win) webcontent
+  win.webContents.printToPDF({}, (err, data) => {
+    if(err) return console.log("there was an error printing to pdf: ", err.message)
+
+    // write the file to pdfPath
+    fs.writeFile(pdfPath, data, (err) => {
+      if(err) return console.log("unable to write file: ", err.message)
+
+      // open the pdf file with the computer's default application
+      shell.openExternal('file://' + pdfPath);
+
+      // send "wrote-pdf" to the renderer process
+      event.sender.send('wrote-pdf', pdfPath)
+    })
+  })
+
+})
+
+
+
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
